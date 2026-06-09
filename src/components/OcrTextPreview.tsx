@@ -15,7 +15,7 @@ export const OcrTextPreview = ({ text, onTextChange, onParse }: Props) => {
       <div className="section-header">
         <div>
           <h2>OCR 文本预览</h2>
-          <p>多张截图的 OCR 文本会合并显示，可手动修正后重新解析。</p>
+          <p>这里显示当前选中基金截图的 OCR 文本，可手动修正后重新解析。</p>
         </div>
         <div className="flex gap-2">
           <button className="secondary-button" onClick={copyText} disabled={!text}>

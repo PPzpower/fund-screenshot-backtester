@@ -15,6 +15,10 @@ type Props = {
   rows: FundNavRow[];
   onRowsChange: (rows: FundNavRow[]) => void;
   onConfirm: () => void;
+  title?: string;
+  description?: string;
+  confirmLabel?: string;
+  confirmDisabled?: boolean;
 };
 
 const validateRows = (rows: FundNavRow[]) => {
@@ -39,9 +43,18 @@ const validateRows = (rows: FundNavRow[]) => {
   });
 };
 
-export const ParsedDataEditor = ({ rows, onRowsChange, onConfirm }: Props) => {
+export const ParsedDataEditor = ({
+  rows,
+  onRowsChange,
+  onConfirm,
+  title = '确认净值数据',
+  description = '请逐行核对 OCR 结果，确认无误后开始回测。',
+  confirmLabel = '确认数据并开始回测',
+  confirmDisabled,
+}: Props) => {
   const validations = validateRows(rows);
   const hasError = validations.some((item) => item.status === 'error');
+  const isConfirmDisabled = confirmDisabled !== undefined ? confirmDisabled || hasError : !rows.length || hasError;
 
   const updateRow = (id: string, patch: Partial<FundNavRow>) => {
     onRowsChange(rows.map((row) => (row.id === id ? { ...row, ...patch } : row)));
@@ -65,8 +78,8 @@ export const ParsedDataEditor = ({ rows, onRowsChange, onConfirm }: Props) => {
     <section className="section">
       <div className="section-header">
         <div>
-          <h2>确认净值数据</h2>
-          <p>多张截图会按日期合并去重；请逐行核对 OCR 结果，确认无误后开始回测。</p>
+          <h2>{title}</h2>
+          <p>{description}</p>
         </div>
       </div>
 
@@ -83,8 +96,8 @@ export const ParsedDataEditor = ({ rows, onRowsChange, onConfirm }: Props) => {
         <button className="secondary-button" onClick={exportCsv} disabled={!rows.length}>
           导出净值 CSV
         </button>
-        <button className="primary-button" onClick={onConfirm} disabled={!rows.length || hasError}>
-          确认数据并开始回测
+        <button className="primary-button" onClick={onConfirm} disabled={isConfirmDisabled}>
+          {confirmLabel}
         </button>
       </div>
 

@@ -37,6 +37,7 @@ export const TradeLogTable = ({ rows }: Props) => {
           <thead>
             <tr>
               <th>日期</th>
+              {tradeRows.some((row) => row.fundName) && <th>基金</th>}
               <th>操作</th>
               <th>交易金额</th>
               <th>净值</th>
@@ -47,8 +48,9 @@ export const TradeLogTable = ({ rows }: Props) => {
           </thead>
           <tbody>
             {tradeRows.map((row) => (
-              <tr key={`${row.date}-${row.tradeType}`}>
+              <tr key={`${row.date}-${row.fundName ?? 'portfolio'}-${row.tradeType}`}>
                 <td>{row.date}</td>
+                {tradeRows.some((item) => item.fundName) && <td>{row.fundName}</td>}
                 <td className={row.action === 'buy' ? 'text-gain font-semibold' : 'text-loss font-semibold'}>
                   {actionText[row.action]}
                 </td>
@@ -61,7 +63,7 @@ export const TradeLogTable = ({ rows }: Props) => {
             ))}
             {!tradeRows.length && (
               <tr>
-                <td colSpan={7} className="py-8 text-center text-slate-400">
+                <td colSpan={tradeRows.some((row) => row.fundName) ? 8 : 7} className="py-8 text-center text-slate-400">
                   新版策略在这段数据中没有产生交易。
                 </td>
               </tr>

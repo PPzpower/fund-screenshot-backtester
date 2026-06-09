@@ -90,12 +90,20 @@ button:disabled {
     @apply border-slate-900 ring-2 ring-slate-200;
   }
 
+  .thumb-image-button {
+    @apply flex-none;
+  }
+
   .screenshot-thumb img {
     @apply h-20 w-16 flex-none rounded border border-slate-200 object-cover;
   }
 
   .screenshot-thumb .name {
-    @apply line-clamp-2 block text-sm font-medium text-slate-700;
+    @apply line-clamp-1 block w-full text-left text-sm font-medium text-slate-700;
+  }
+
+  .fund-name-input {
+    @apply mt-2 w-full rounded-md border border-slate-200 px-2 py-1 text-xs outline-none focus:border-slate-900;
   }
 
   .import-status {

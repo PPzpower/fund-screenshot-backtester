@@ -8,6 +8,7 @@ type Props = {
   isRecognizing: boolean;
   onFilesChange: (files: File[]) => void;
   onSelectScreenshot: (id: string) => void;
+  onRenameScreenshot: (id: string, fundName: string) => void;
   onStart: () => void;
   onReset: () => void;
 };
@@ -20,6 +21,7 @@ export const ImageUploader = ({
   isRecognizing,
   onFilesChange,
   onSelectScreenshot,
+  onRenameScreenshot,
   onStart,
   onReset,
 }: Props) => {
@@ -30,7 +32,7 @@ export const ImageUploader = ({
       <div className="section-header">
         <div>
           <h2>上传截图</h2>
-          <p>支持一次选择多张截图，截图只在浏览器本地识别，不会上传到服务器。</p>
+          <p>每张截图代表一个基金，所有基金会作为一个组合一起回测。</p>
         </div>
       </div>
 
@@ -49,7 +51,7 @@ export const ImageUploader = ({
           />
           <span className="text-base font-semibold text-slate-800">选择一张或多张基金 App 净值截图</span>
           <span className="mt-2 text-sm text-slate-500">
-            支持 PNG、JPG、WebP。多张图会逐张 OCR，并合并到下方可编辑表格。
+            支持 PNG、JPG、WebP。多张图会逐张 OCR，每张图独立生成一只基金的数据。
           </span>
         </label>
 
@@ -70,21 +72,31 @@ export const ImageUploader = ({
           </div>
           <div className="screenshot-grid">
             {screenshots.map((item, index) => (
-              <button
+              <div
                 key={item.id}
                 className={`screenshot-thumb ${item.id === activeScreenshot?.id ? 'active' : ''}`}
-                onClick={() => onSelectScreenshot(item.id)}
-                type="button"
               >
-                <img src={item.previewUrl} alt={item.name} />
-                <span className="name">{index + 1}. {item.name}</span>
-                <span className={`import-status ${item.status}`}>
-                  {item.status === 'pending' && '待识别'}
-                  {item.status === 'recognizing' && '识别中'}
-                  {item.status === 'done' && `${item.parsedRows.length} 条`}
-                  {item.status === 'error' && '失败'}
-                </span>
-              </button>
+                <button className="thumb-image-button" type="button" onClick={() => onSelectScreenshot(item.id)}>
+                  <img src={item.previewUrl} alt={item.name} />
+                </button>
+                <div className="min-w-0 flex-1">
+                  <button className="name" type="button" onClick={() => onSelectScreenshot(item.id)}>
+                    {index + 1}. {item.name}
+                  </button>
+                  <input
+                    className="fund-name-input"
+                    value={item.fundName}
+                    onChange={(event) => onRenameScreenshot(item.id, event.target.value)}
+                    placeholder="基金名称"
+                  />
+                  <span className={`import-status ${item.status}`}>
+                    {item.status === 'pending' && '待识别'}
+                    {item.status === 'recognizing' && '识别中'}
+                    {item.status === 'done' && `${item.parsedRows.length} 条`}
+                    {item.status === 'error' && '失败'}
+                  </span>
+                </div>
+              </div>
             ))}
           </div>
         </div>

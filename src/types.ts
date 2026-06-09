@@ -18,6 +18,7 @@ export type FundNavRow = {
 
 export type ScreenshotImport = {
   id: string;
+  fundName: string;
   name: string;
   file: File;
   previewUrl: string;
@@ -62,6 +63,7 @@ export type BacktestRow = {
   action: TradeAction;
   tradeAmount: number;
   tradeType: string;
+  fundName?: string;
   marketRegime: MarketRegime;
   signalReason: string;
   maxPositionAllowed: number;
