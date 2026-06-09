@@ -43,15 +43,28 @@ npm run build
 
 ## GitHub Pages 部署
 
-本项目已包含 `.github/workflows/deploy.yml`，push 到 `main` 分支后会自动构建并部署 `dist/` 到 GitHub Pages。
+当前线上版本使用 GitHub Pages 的 `main /docs` 发布方式，不依赖 GitHub Actions。构建后把 `dist/` 同步到 `docs/`，push 到 `main` 后 GitHub Pages 会自动更新。
 
 首次使用需要在 GitHub 仓库中开启 Pages：
 
 1. 进入仓库 `Settings`。
 2. 打开 `Pages`。
-3. 在 `Build and deployment` 中选择 `GitHub Actions`。
-4. 推送代码到 `main` 分支。
-5. 等待 Actions 执行完成后访问 Pages 地址。
+3. 在 `Build and deployment` 中选择 `Deploy from a branch`。
+4. Branch 选择 `main`，目录选择 `/docs`。
+5. 推送代码到 `main` 分支。
+6. 等待 Pages 构建完成后访问 Pages 地址。
+
+每次更新页面后执行：
+
+```bash
+npm run build
+cp -R dist/. docs/
+git add .
+git commit -m "Update site"
+git push
+```
+
+项目本地仍保留 `.github/workflows/deploy.yml`，如果你的 GitHub token 拥有 `workflow` 权限，也可以改用 GitHub Actions 自动构建并部署 `dist/`。
 
 当前仓库名按 `fund-screenshot-backtester` 配置，`vite.config.ts` 中：
 
