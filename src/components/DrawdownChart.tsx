@@ -1,0 +1,52 @@
+import * as echarts from 'echarts';
+import { useEffect, useRef } from 'react';
+import type { BacktestResult } from '../types';
+
+type Props = {
+  results: BacktestResult[];
+};
+
+export const DrawdownChart = ({ results }: Props) => {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!ref.current || !results.length) return;
+    const chart = echarts.init(ref.current);
+    const dates = results[0].rows.map((row) => row.date);
+    chart.setOption({
+      tooltip: {
+        trigger: 'axis',
+        valueFormatter: (value: number) => `${value.toFixed(2)}%`,
+      },
+      legend: { top: 0 },
+      grid: { left: 56, right: 20, top: 48, bottom: 36 },
+      xAxis: { type: 'category', data: dates, boundaryGap: false },
+      yAxis: { type: 'value', axisLabel: { formatter: '{value}%' } },
+      series: results.map((result) => ({
+        name: result.strategyName,
+        type: 'line',
+        symbol: 'none',
+        areaStyle: { opacity: 0.08 },
+        data: result.rows.map((row) => Number((row.drawdown * 100).toFixed(2))),
+      })),
+    });
+    const resize = () => chart.resize();
+    window.addEventListener('resize', resize);
+    return () => {
+      window.removeEventListener('resize', resize);
+      chart.dispose();
+    };
+  }, [results]);
+
+  return (
+    <section className="section">
+      <div className="section-header">
+        <div>
+          <h2>回撤曲线</h2>
+          <p>越接近 0 表示回撤越小。</p>
+        </div>
+      </div>
+      <div ref={ref} className="chart" />
+    </section>
+  );
+};
