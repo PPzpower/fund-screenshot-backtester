@@ -1,30 +1,36 @@
-import type { OcrProgress } from '../types';
+import type { OcrProgress, ScreenshotImport } from '../types';
 
 type Props = {
-  imageUrl?: string;
+  screenshots: ScreenshotImport[];
+  activeScreenshotId?: string;
   progress: OcrProgress;
   error?: string;
   isRecognizing: boolean;
-  onFileChange: (file: File) => void;
+  onFilesChange: (files: File[]) => void;
+  onSelectScreenshot: (id: string) => void;
   onStart: () => void;
   onReset: () => void;
 };
 
 export const ImageUploader = ({
-  imageUrl,
+  screenshots,
+  activeScreenshotId,
   progress,
   error,
   isRecognizing,
-  onFileChange,
+  onFilesChange,
+  onSelectScreenshot,
   onStart,
   onReset,
 }: Props) => {
+  const activeScreenshot = screenshots.find((item) => item.id === activeScreenshotId) ?? screenshots[0];
+
   return (
     <section className="section">
       <div className="section-header">
         <div>
           <h2>上传截图</h2>
-          <p>截图只在浏览器本地识别，不会上传到服务器。</p>
+          <p>支持一次选择多张截图，截图只在浏览器本地识别，不会上传到服务器。</p>
         </div>
       </div>
 
@@ -32,32 +38,63 @@ export const ImageUploader = ({
         <label className="upload-zone">
           <input
             type="file"
+            multiple
             accept="image/png,image/jpeg,image/webp"
             className="sr-only"
             onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) onFileChange(file);
+              const files = Array.from(event.target.files ?? []);
+              if (files.length) onFilesChange(files);
               event.currentTarget.value = '';
             }}
           />
-          <span className="text-base font-semibold text-slate-800">选择基金 App 净值截图</span>
-          <span className="mt-2 text-sm text-slate-500">支持 PNG、JPG、WebP。建议截取包含日期、净值、日涨幅的表格区域。</span>
+          <span className="text-base font-semibold text-slate-800">选择一张或多张基金 App 净值截图</span>
+          <span className="mt-2 text-sm text-slate-500">
+            支持 PNG、JPG、WebP。多张图会逐张 OCR，并合并到下方可编辑表格。
+          </span>
         </label>
 
         <div className="preview-box">
-          {imageUrl ? (
-            <img src={imageUrl} alt="截图预览" className="h-full w-full object-contain" />
+          {activeScreenshot ? (
+            <img src={activeScreenshot.previewUrl} alt={activeScreenshot.name} className="h-full w-full object-contain" />
           ) : (
             <span className="text-sm text-slate-400">暂无图片预览</span>
           )}
         </div>
       </div>
 
+      {screenshots.length > 0 && (
+        <div className="mt-4">
+          <div className="mb-2 flex items-center justify-between text-sm text-slate-600">
+            <span>已选择 {screenshots.length} 张截图</span>
+            <span>{screenshots.filter((item) => item.status === 'done').length} 张已识别</span>
+          </div>
+          <div className="screenshot-grid">
+            {screenshots.map((item, index) => (
+              <button
+                key={item.id}
+                className={`screenshot-thumb ${item.id === activeScreenshot?.id ? 'active' : ''}`}
+                onClick={() => onSelectScreenshot(item.id)}
+                type="button"
+              >
+                <img src={item.previewUrl} alt={item.name} />
+                <span className="name">{index + 1}. {item.name}</span>
+                <span className={`import-status ${item.status}`}>
+                  {item.status === 'pending' && '待识别'}
+                  {item.status === 'recognizing' && '识别中'}
+                  {item.status === 'done' && `${item.parsedRows.length} 条`}
+                  {item.status === 'error' && '失败'}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-        <button className="primary-button" disabled={!imageUrl || isRecognizing} onClick={onStart}>
-          {isRecognizing ? '识别中...' : '开始识别'}
+        <button className="primary-button" disabled={!screenshots.length || isRecognizing} onClick={onStart}>
+          {isRecognizing ? '识别中...' : screenshots.length > 1 ? '开始批量识别' : '开始识别'}
         </button>
-        <button className="secondary-button" disabled={isRecognizing && !imageUrl} onClick={onReset}>
+        <button className="secondary-button" disabled={isRecognizing && !screenshots.length} onClick={onReset}>
           重新上传
         </button>
       </div>

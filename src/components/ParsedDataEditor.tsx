@@ -66,7 +66,7 @@ export const ParsedDataEditor = ({ rows, onRowsChange, onConfirm }: Props) => {
       <div className="section-header">
         <div>
           <h2>确认净值数据</h2>
-          <p>请逐行核对 OCR 结果，确认无误后开始回测。</p>
+          <p>多张截图会按日期合并去重；请逐行核对 OCR 结果，确认无误后开始回测。</p>
         </div>
       </div>
 

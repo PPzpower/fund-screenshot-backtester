@@ -16,6 +16,17 @@ export type FundNavRow = {
   rawText?: string;
 };
 
+export type ScreenshotImport = {
+  id: string;
+  name: string;
+  file: File;
+  previewUrl: string;
+  status: 'pending' | 'recognizing' | 'done' | 'error';
+  ocrText: string;
+  parsedRows: FundNavRow[];
+  error?: string;
+};
+
 export type ParsedValidation = {
   status: 'valid' | 'warning' | 'error';
   messages: string[];
