@@ -40,7 +40,7 @@ export const StrategyConfigPanel = ({ config, onChange }: Props) => {
       <div className="section-header">
         <div>
           <h2>参数设置</h2>
-          <p>参数会用于新版策略和参数优化，可根据基金风格微调。</p>
+          <p>参数会用于组合中每只基金的新版策略，可根据基金风格微调。</p>
         </div>
       </div>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

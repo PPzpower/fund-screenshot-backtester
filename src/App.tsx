@@ -3,6 +3,7 @@ import { DEFAULT_STRATEGY_CONFIG, STRATEGY_NAMES } from './config';
 import { runAllStrategies } from './backtest/engine';
 import { AssetChart } from './components/AssetChart';
 import { DrawdownChart } from './components/DrawdownChart';
+import { FundCodeImporter } from './components/FundCodeImporter';
 import { ImageUploader } from './components/ImageUploader';
 import { MetricsTable } from './components/MetricsTable';
 import { OcrTextPreview } from './components/OcrTextPreview';
@@ -14,6 +15,7 @@ import { TradeSignalChart } from './components/TradeSignalChart';
 import type {
   BacktestResult,
   BacktestRow,
+  FundDataSet,
   FundNavRow,
   MarketRegime,
   OcrProgress,
@@ -188,14 +190,14 @@ const aggregateStrategyResults = (
 };
 
 const runPortfolioBacktest = (
-  screenshots: ScreenshotImport[],
+  fundDataSets: FundDataSet[],
   config: StrategyConfig,
 ): PortfolioBacktest => {
-  const validFunds = screenshots
+  const validFunds = fundDataSets
     .map((item) => ({
       fundId: item.id,
-      fundName: item.fundName.trim() || item.name,
-      rows: normalizeRowsForBacktest(item.parsedRows),
+      fundName: item.fundName.trim() || item.fundCode || item.id,
+      rows: normalizeRowsForBacktest(item.rows),
     }))
     .filter((item) => item.rows.length > 0);
 
@@ -230,7 +232,9 @@ const runPortfolioBacktest = (
 
 export default function App() {
   const [screenshots, setScreenshots] = useState<ScreenshotImport[]>([]);
+  const [codeFunds, setCodeFunds] = useState<FundDataSet[]>([]);
   const [activeScreenshotId, setActiveScreenshotId] = useState<string>();
+  const [activeFundId, setActiveFundId] = useState<string>();
   const [portfolio, setPortfolio] = useState<PortfolioBacktest>();
   const [config, setConfig] = useState<StrategyConfig>(DEFAULT_STRATEGY_CONFIG);
   const [progress, setProgress] = useState<OcrProgress>(idleProgress);
@@ -240,6 +244,22 @@ export default function App() {
   const activeScreenshot = useMemo(
     () => screenshots.find((item) => item.id === activeScreenshotId) ?? screenshots[0],
     [activeScreenshotId, screenshots],
+  );
+  const screenshotFunds = useMemo<FundDataSet[]>(
+    () =>
+      screenshots.map((item) => ({
+        id: item.id,
+        fundName: item.fundName.trim() || item.name,
+        source: 'screenshot',
+        rows: item.parsedRows,
+        ocrText: item.ocrText,
+      })),
+    [screenshots],
+  );
+  const allFunds = useMemo(() => [...codeFunds, ...screenshotFunds], [codeFunds, screenshotFunds]);
+  const activeFund = useMemo(
+    () => allFunds.find((item) => item.id === activeFundId) ?? allFunds[0],
+    [activeFundId, allFunds],
   );
   const results = portfolio?.results ?? [];
   const newRuleResult = useMemo(
@@ -265,6 +285,7 @@ export default function App() {
     }));
     setScreenshots(nextScreenshots);
     setActiveScreenshotId(nextScreenshots[0]?.id);
+    setActiveFundId(nextScreenshots[0]?.id);
     setPortfolio(undefined);
     setError('');
     setProgress(idleProgress);
@@ -274,6 +295,7 @@ export default function App() {
     screenshots.forEach((item) => URL.revokeObjectURL(item.previewUrl));
     setScreenshots([]);
     setActiveScreenshotId(undefined);
+    setActiveFundId(undefined);
     setPortfolio(undefined);
     setError('');
     setProgress(idleProgress);
@@ -291,6 +313,7 @@ export default function App() {
         if (!screenshot) continue;
 
         setActiveScreenshotId(screenshot.id);
+        setActiveFundId(screenshot.id);
         updateScreenshot(screenshot.id, { status: 'recognizing', error: undefined });
 
         const text = await recognizeScreenshot(screenshot.file, (nextProgress) => {
@@ -326,12 +349,14 @@ export default function App() {
   };
 
   const parseTextAgain = () => {
-    if (!activeScreenshot) return;
-    const rows = parseOcrText(activeScreenshot.ocrText);
-    updateScreenshot(activeScreenshot.id, { parsedRows: rows, status: rows.length ? 'done' : 'error' });
+    if (!activeFund || activeFund.source !== 'screenshot') return;
+    const screenshot = screenshots.find((item) => item.id === activeFund.id);
+    if (!screenshot) return;
+    const rows = parseOcrText(screenshot.ocrText);
+    updateScreenshot(screenshot.id, { parsedRows: rows, status: rows.length ? 'done' : 'error' });
     setProgress({
       stage: 'parse',
-      label: `${activeScreenshot.fundName} 已重新解析 ${rows.length} 条净值记录`,
+      label: `${screenshot.fundName} 已重新解析 ${rows.length} 条净值记录`,
       progress: 1,
     });
     if (!rows.length) setError('未解析到净值行，请检查日期、净值和日涨幅是否在同一行附近。');
@@ -339,7 +364,7 @@ export default function App() {
   };
 
   const confirmAndBacktest = () => {
-    const nextPortfolio = runPortfolioBacktest(screenshots, config);
+    const nextPortfolio = runPortfolioBacktest(allFunds, config);
     setPortfolio(nextPortfolio);
     if (!nextPortfolio.funds.length) {
       setError('还没有任何基金拥有可回测的净值数据，请先完成 OCR 并核对表格。');
@@ -349,19 +374,19 @@ export default function App() {
   };
 
   const rerunBacktest = () => {
-    if (!screenshots.some((item) => item.parsedRows.length)) return;
-    setPortfolio(runPortfolioBacktest(screenshots, config));
+    if (!allFunds.some((item) => item.rows.length)) return;
+    setPortfolio(runPortfolioBacktest(allFunds, config));
   };
 
-  const activeRows = activeScreenshot?.parsedRows ?? [];
-  const activeOcrText = activeScreenshot?.ocrText ?? '';
+  const activeRows = activeFund?.rows ?? [];
+  const activeOcrText = activeFund?.source === 'screenshot' ? activeFund.ocrText ?? '' : '';
   return (
     <main className="min-h-screen bg-slate-100 text-slate-900">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
         <header className="app-header">
           <div>
             <h1>A股科技基金截图回测模拟器</h1>
-            <p>批量上传多只基金净值截图，把它们作为一个组合一起回测加仓减仓策略。</p>
+            <p>输入基金代码或上传截图，获取近 N 天净值，把多只基金作为一个组合一起回测。</p>
           </div>
           {results.length > 0 && (
             <div className="header-stat">
@@ -376,7 +401,7 @@ export default function App() {
           <div className="section-header">
             <div>
               <h2>组合回测口径</h2>
-              <p>每张截图代表一只基金；初始资金会平均分配到所有基金资金槽。</p>
+              <p>每个基金代码或每张截图代表一只基金；初始资金会平均分配到所有基金资金槽。</p>
             </div>
           </div>
           <div className="grid gap-3 text-sm leading-6 text-slate-700 md:grid-cols-2">
@@ -389,6 +414,20 @@ export default function App() {
           </div>
         </section>
 
+        <FundCodeImporter
+          funds={codeFunds}
+          onImported={(funds) => {
+            setCodeFunds(funds);
+            setActiveFundId(funds[0]?.id ?? screenshots[0]?.id);
+            setActiveScreenshotId(undefined);
+            setPortfolio(undefined);
+          }}
+          onSelectFund={(id) => {
+            setActiveFundId(id);
+            setActiveScreenshotId(undefined);
+          }}
+        />
+
         <ImageUploader
           screenshots={screenshots}
           activeScreenshotId={activeScreenshotId}
@@ -396,37 +435,75 @@ export default function App() {
           error={error}
           isRecognizing={isRecognizing}
           onFilesChange={handleFilesChange}
-          onSelectScreenshot={setActiveScreenshotId}
+          onSelectScreenshot={(id) => {
+            setActiveScreenshotId(id);
+            setActiveFundId(id);
+          }}
           onRenameScreenshot={(id, fundName) => updateScreenshot(id, { fundName })}
           onStart={startOcr}
           onReset={resetUpload}
         />
 
-        {activeScreenshot && (
+        {activeFund && (
           <section className="section">
             <div className="section-header">
               <div>
                 <h2>当前核对基金</h2>
-                <p>{activeScreenshot.fundName}。请在上方缩略图切换其他基金逐只核对。</p>
+                <p>
+                  {activeFund.fundName}
+                  {activeFund.fundCode ? `（${activeFund.fundCode}）` : ''}。当前表格只属于这只基金。
+                </p>
               </div>
             </div>
           </section>
         )}
 
-        <OcrTextPreview
-          text={activeOcrText}
-          onTextChange={(text) => activeScreenshot && updateScreenshot(activeScreenshot.id, { ocrText: text })}
-          onParse={parseTextAgain}
-        />
+        {activeFund?.source === 'screenshot' && (
+          <OcrTextPreview
+            text={activeOcrText}
+            onTextChange={(text) => updateScreenshot(activeFund.id, { ocrText: text })}
+            onParse={parseTextAgain}
+          />
+        )}
+
+        {activeFund?.source === 'fund-code' && (
+          <section className="section">
+            <div className="section-header">
+              <div>
+                <h2>基金代码数据</h2>
+                <p>代码导入的数据来自公开净值脚本，无需 OCR。可在下方净值表中核对和修改。</p>
+              </div>
+            </div>
+          </section>
+        )}
 
         <ParsedDataEditor
           rows={activeRows}
-          onRowsChange={(rows) => activeScreenshot && updateScreenshot(activeScreenshot.id, { parsedRows: rows })}
+          onRowsChange={(rows) => {
+            if (!activeFund) return;
+            if (activeFund.source === 'screenshot') {
+              updateScreenshot(activeFund.id, { parsedRows: rows });
+            } else {
+              setCodeFunds((current) =>
+                current.map((fund) =>
+                  fund.id === activeFund.id
+                    ? {
+                        ...fund,
+                        rows,
+                        actualTradingDays: rows.length,
+                        startDate: rows[0]?.date,
+                        endDate: rows[rows.length - 1]?.date,
+                      }
+                    : fund,
+                ),
+              );
+            }
+          }}
           onConfirm={confirmAndBacktest}
-          title={activeScreenshot ? `${activeScreenshot.fundName} 净值数据` : '确认净值数据'}
+          title={activeFund ? `${activeFund.fundName} 净值数据` : '确认净值数据'}
           description="当前表格只属于选中的这只基金。多只基金不会合并日期；确认后会作为一个组合一起回测。"
           confirmLabel="确认全部基金并开始组合回测"
-          confirmDisabled={!screenshots.some((item) => item.parsedRows.length)}
+          confirmDisabled={!allFunds.some((item) => item.rows.length)}
         />
 
         <StrategyConfigPanel config={config} onChange={setConfig} />

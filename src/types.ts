@@ -12,8 +12,23 @@ export type FundNavRow = {
   id: string;
   date: string;
   nav: number;
+  cumulativeNav?: number;
   dailyReturn?: number;
   rawText?: string;
+};
+
+export type FundDataSet = {
+  id: string;
+  fundName: string;
+  fundCode?: string;
+  source: 'fund-code' | 'screenshot';
+  rows: FundNavRow[];
+  recentDays?: number;
+  actualTradingDays?: number;
+  periodReturn?: number;
+  startDate?: string;
+  endDate?: string;
+  ocrText?: string;
 };
 
 export type ScreenshotImport = {
