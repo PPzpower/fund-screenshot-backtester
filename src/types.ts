@@ -6,7 +6,9 @@ export type StrategyId =
   | 'buy_and_hold'
   | 'fixed_50_percent'
   | 'old_rule_strategy'
-  | 'new_rule_strategy';
+  | 'new_rule_strategy'
+  | 'adaptive_profit_strategy'
+  | 'adaptive_defensive_strategy';
 
 export type FundNavRow = {
   id: string;
@@ -54,6 +56,7 @@ export type StrategyConfig = {
   minPosition: number;
   maxPosition: number;
   breakdownMaxPosition: number;
+  uptrendMinPosition: number;
   buyFee: number;
   sellFee: number;
   singleDayDropThreshold: number;

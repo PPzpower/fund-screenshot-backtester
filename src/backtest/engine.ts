@@ -3,13 +3,15 @@ import type { BacktestResult, BacktestRow, FundNavRow, StrategyConfig, StrategyI
 import { buildIndicators } from '../utils/indicators';
 import { calculateMetrics } from '../utils/metrics';
 import { clamp, normalizeRowsForBacktest } from '../utils/format';
-import { getMaxPositionAllowed, getStrategyInitialPosition, getStrategySignal } from './strategies';
+import { getMaxPositionAllowed, getMinPositionAllowed, getStrategyInitialPosition, getStrategySignal } from './strategies';
 
 const strategyOrder: StrategyId[] = [
   'buy_and_hold',
   'fixed_50_percent',
   'old_rule_strategy',
   'new_rule_strategy',
+  'adaptive_profit_strategy',
+  'adaptive_defensive_strategy',
 ];
 
 type Portfolio = {
@@ -101,14 +103,15 @@ export const runBacktest = (
 
   rows.forEach((row, index) => {
     const marketRegime = indicators.regimes[index];
-    const maxPositionAllowed =
-      strategyId === 'new_rule_strategy'
-        ? getMaxPositionAllowed(config, marketRegime)
-        : strategyId === 'buy_and_hold'
-          ? 1
-          : config.maxPosition;
-    const signal = getStrategySignal(strategyId, rows, index, config, marketRegime);
     const amountPerPart = config.initialCash / 10;
+    const maxPositionAllowed = getMaxPositionAllowed(strategyId, config, marketRegime);
+    const minPositionAllowed = getMinPositionAllowed(strategyId, config, marketRegime);
+    const beforeSignal = calculateSnapshot(portfolio, row.nav);
+    const signal = getStrategySignal(strategyId, rows, index, config, marketRegime, {
+      positionRatio: beforeSignal.positionRatio,
+      totalAsset: beforeSignal.totalAsset,
+      amountPerPart,
+    });
     let action = signal.action;
     let tradeAmount = 0;
     let signalReason = signal.reason;
@@ -124,7 +127,7 @@ export const runBacktest = (
       }
     } else if (signal.action === 'sell') {
       const requested = signal.parts * amountPerPart;
-      tradeAmount = sell(portfolio, row.nav, requested, config.minPosition, config.sellFee);
+      tradeAmount = sell(portfolio, row.nav, requested, minPositionAllowed, config.sellFee);
       if (tradeAmount <= 0) {
         action = 'hold';
         tradeType = 'sell_blocked';

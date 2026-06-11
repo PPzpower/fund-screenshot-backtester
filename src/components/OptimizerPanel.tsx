@@ -67,7 +67,7 @@ export const OptimizerPanel = ({ rows, config }: Props) => {
       <div className="section-header">
         <div>
           <h2>参数优化</h2>
-          <p>对新版策略做网格搜索，输出排名前 20 的参数组合。</p>
+          <p>对策略参数做网格搜索，输出排名前 20 的参数组合。</p>
         </div>
       </div>
 

@@ -15,6 +15,11 @@ export const MetricsTable = ({ results }: Props) => {
   const bestReturnDrawdown = Math.max(
     ...metrics.map((item) => item.totalReturn / Math.max(Math.abs(item.maxDrawdown), 0.0001)),
   );
+  const returnRanks = new Map(
+    [...results]
+      .sort((a, b) => b.metrics.totalReturn - a.metrics.totalReturn)
+      .map((result, index) => [result.strategyId, index + 1]),
+  );
 
   return (
     <section className="section">
@@ -33,6 +38,7 @@ export const MetricsTable = ({ results }: Props) => {
           <thead>
             <tr>
               <th>策略</th>
+              <th>收益排名</th>
               <th>期末资产</th>
               <th>总收益</th>
               <th>年化收益</th>
@@ -49,7 +55,11 @@ export const MetricsTable = ({ results }: Props) => {
               const returnDrawdown = item.totalReturn / Math.max(Math.abs(item.maxDrawdown), 0.0001);
               return (
                 <tr key={result.strategyId}>
-                  <td className="font-semibold">{item.strategyName}</td>
+                  <td className="font-semibold">
+                    {item.strategyName}
+                    {item.totalReturn === bestReturn && <span className="ml-2 highlight-gain">收益最高</span>}
+                  </td>
+                  <td>{returnRanks.get(result.strategyId)}</td>
                   <td>{formatMoney(item.finalAsset)}</td>
                   <td className={item.totalReturn === bestReturn ? 'highlight-gain' : item.totalReturn >= 0 ? 'text-gain' : 'text-loss'}>
                     {formatPercent(item.totalReturn)}

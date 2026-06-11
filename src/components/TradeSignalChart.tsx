@@ -4,6 +4,7 @@ import type { BacktestRow, MarketRegime } from '../types';
 
 type Props = {
   rows: BacktestRow[];
+  strategyName: string;
 };
 
 const regimeName: Record<MarketRegime, string> = {
@@ -34,7 +35,7 @@ const buildRegimeAreas = (rows: BacktestRow[]) => {
   return areas;
 };
 
-export const TradeSignalChart = ({ rows }: Props) => {
+export const TradeSignalChart = ({ rows, strategyName }: Props) => {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -95,14 +96,14 @@ export const TradeSignalChart = ({ rows }: Props) => {
       window.removeEventListener('resize', resize);
       chart.dispose();
     };
-  }, [rows]);
+  }, [rows, strategyName]);
 
   return (
     <section className="section">
       <div className="section-header">
         <div>
           <h2>买卖点与市场状态</h2>
-          <p>背景色表示主升浪、震荡或破位状态。</p>
+          <p>{strategyName}，背景色表示主升浪、震荡或破位状态。</p>
         </div>
       </div>
       <div ref={ref} className="chart" />

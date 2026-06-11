@@ -19,6 +19,7 @@ const fields: NumericField[] = [
   { key: 'minPosition', label: '最低仓位', type: 'percent' },
   { key: 'maxPosition', label: '最高仓位', type: 'percent' },
   { key: 'breakdownMaxPosition', label: '破位最高仓位', type: 'percent' },
+  { key: 'uptrendMinPosition', label: '主升浪最低仓位', type: 'percent' },
   { key: 'buyFee', label: '申购费', type: 'percent' },
   { key: 'sellFee', label: '赎回费', type: 'percent' },
   { key: 'singleDayDropThreshold', label: '单日下跌加仓阈值', type: 'percent' },
@@ -40,7 +41,7 @@ export const StrategyConfigPanel = ({ config, onChange }: Props) => {
       <div className="section-header">
         <div>
           <h2>参数设置</h2>
-          <p>参数会用于组合中每只基金的新版策略，可根据基金风格微调。</p>
+          <p>参数会用于历史回测策略，可根据基金风格微调后重新比较收益。</p>
         </div>
       </div>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

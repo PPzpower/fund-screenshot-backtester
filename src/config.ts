@@ -8,6 +8,7 @@ export const DEFAULT_STRATEGY_CONFIG: StrategyConfig = {
   minPosition: 0.3,
   maxPosition: 0.85,
   breakdownMaxPosition: 0.6,
+  uptrendMinPosition: 0.7,
   buyFee: 0.0015,
   sellFee: 0.0015,
   singleDayDropThreshold: -0.018,
@@ -25,6 +26,8 @@ export const STRATEGY_NAMES: Record<StrategyId, string> = {
   fixed_50_percent: '固定 50% 仓位',
   old_rule_strategy: '旧版加减仓规则',
   new_rule_strategy: '新版趋势过滤策略',
+  adaptive_profit_strategy: '三档收益优先策略',
+  adaptive_defensive_strategy: '三档稳健防守策略',
 };
 
 export const OPTIMIZER_GRID = {
@@ -37,6 +40,7 @@ export const OPTIMIZER_GRID = {
   initialPosition: [0.4, 0.5, 0.6],
   maxPosition: [0.8, 0.85, 0.9],
   minPosition: [0.2, 0.3, 0.4],
+  uptrendMinPosition: [0.65, 0.7, 0.75],
 };
 
 export const DAILY_RETURN_WARNING_RANGE = {

@@ -47,7 +47,11 @@ const strategyIds: StrategyId[] = [
   'fixed_50_percent',
   'old_rule_strategy',
   'new_rule_strategy',
+  'adaptive_profit_strategy',
+  'adaptive_defensive_strategy',
 ];
+
+const featuredStrategyId: StrategyId = 'adaptive_profit_strategy';
 
 type FundBacktestBundle = {
   fundId: string;
@@ -59,7 +63,7 @@ type FundBacktestBundle = {
 type PortfolioBacktest = {
   funds: FundBacktestBundle[];
   results: BacktestResult[];
-  newRuleTradeRows: BacktestRow[];
+  featuredTradeRows: BacktestRow[];
 };
 
 const stripExtension = (filename: string) => filename.replace(/\.[^.]+$/, '');
@@ -119,6 +123,7 @@ const aggregateStrategyResults = (
   fundResults: Array<{ fundName: string; result: BacktestResult }>,
   totalInitialCash: number,
 ): BacktestResult => {
+  const isPortfolio = fundResults.length > 1;
   const dates = Array.from(
     new Set(fundResults.flatMap(({ result }) => result.rows.map((row) => row.date))),
   ).sort();
@@ -169,9 +174,13 @@ const aggregateStrategyResults = (
       positionRatio,
       action,
       tradeAmount,
-      tradeType: tradeRows.length ? '组合交易汇总' : 'hold',
+      tradeType: tradeRows.length ? (isPortfolio ? '组合交易汇总' : tradeRows[0].tradeType) : 'hold',
       marketRegime: getDominantRegime(exactRows.length ? exactRows : latestRows.filter(Boolean)),
-      signalReason: tradeRows.length ? `当日组合内 ${tradeRows.length} 笔交易` : '组合未触发交易',
+      signalReason: tradeRows.length
+        ? isPortfolio
+          ? `当日组合内 ${tradeRows.length} 笔交易`
+          : tradeRows[0].signalReason
+        : '未触发交易',
       maxPositionAllowed: latestRows.length
         ? latestRows.reduce((sum, row) => sum + (row?.maxPositionAllowed ?? 0), 0) / latestRows.length
         : 0,
@@ -180,7 +189,7 @@ const aggregateStrategyResults = (
     };
   });
 
-  const strategyName = `${STRATEGY_NAMES[strategyId]}（组合）`;
+  const strategyName = isPortfolio ? `${STRATEGY_NAMES[strategyId]}（组合）` : STRATEGY_NAMES[strategyId];
   return {
     strategyId,
     strategyName,
@@ -218,16 +227,16 @@ const runPortfolioBacktest = (
     ),
   );
 
-  const newRuleTradeRows = funds
+  const featuredTradeRows = funds
     .flatMap((fund) => {
-      const result = fund.results.find((item) => item.strategyId === 'new_rule_strategy');
+      const result = fund.results.find((item) => item.strategyId === featuredStrategyId);
       return (result?.rows ?? [])
         .filter((row) => row.action !== 'hold' && row.tradeAmount > 0)
         .map((row) => ({ ...row, fundName: fund.fundName }));
     })
     .sort((a, b) => a.date.localeCompare(b.date) || (a.fundName ?? '').localeCompare(b.fundName ?? ''));
 
-  return { funds, results, newRuleTradeRows };
+  return { funds, results, featuredTradeRows };
 };
 
 export default function App() {
@@ -262,8 +271,16 @@ export default function App() {
     [activeFundId, allFunds],
   );
   const results = portfolio?.results ?? [];
-  const newRuleResult = useMemo(
-    () => results.find((result) => result.strategyId === 'new_rule_strategy'),
+  const featuredResult = useMemo(
+    () => results.find((result) => result.strategyId === featuredStrategyId),
+    [results],
+  );
+  const bestReturnResult = useMemo(
+    () =>
+      results.reduce<BacktestResult | undefined>(
+        (best, result) => (!best || result.metrics.totalReturn > best.metrics.totalReturn ? result : best),
+        undefined,
+      ),
     [results],
   );
 
@@ -334,7 +351,7 @@ export default function App() {
 
       setProgress({
         stage: 'done',
-        label: `已识别 ${screenshots.length} 只基金，请逐只核对后开始组合回测`,
+        label: `已识别 ${screenshots.length} 只基金，请逐只核对后开始策略回测`,
         progress: 1,
       });
     } catch (caught) {
@@ -386,13 +403,13 @@ export default function App() {
         <header className="app-header">
           <div>
             <h1>A股科技基金截图回测模拟器</h1>
-            <p>输入基金代码或上传截图，获取近 N 天净值，把多只基金作为一个组合一起回测。</p>
+            <p>输入基金代码或上传截图，获取历史日涨跌幅，比较不同策略在该基金上的模拟收益。</p>
           </div>
           {results.length > 0 && (
             <div className="header-stat">
-              <span>组合新版策略期末资产</span>
-              <strong>{formatMoney(newRuleResult?.metrics.finalAsset ?? 0)}</strong>
-              <small>{formatPercent(newRuleResult?.metrics.totalReturn)}</small>
+              <span>当前收益最高：{bestReturnResult?.strategyName}</span>
+              <strong>{formatMoney(bestReturnResult?.metrics.finalAsset ?? 0)}</strong>
+              <small>{formatPercent(bestReturnResult?.metrics.totalReturn)}</small>
             </div>
           )}
         </header>
@@ -400,13 +417,13 @@ export default function App() {
         <section className="section">
           <div className="section-header">
             <div>
-              <h2>组合回测口径</h2>
-              <p>每个基金代码或每张截图代表一只基金；初始资金会平均分配到所有基金资金槽。</p>
+              <h2>回测口径</h2>
+              <p>单只基金会直接回测该基金；多只基金会按资金槽汇总为组合。</p>
             </div>
           </div>
           <div className="grid gap-3 text-sm leading-6 text-slate-700 md:grid-cols-2">
             <p>
-              每只基金按照自己的净值涨跌独立触发加仓/减仓信号，最后汇总为整个组合的资产、回撤、仓位和交易日志。
+              每只基金按照自己的净值涨跌独立触发加仓/减仓信号；如果只输入一只基金，结果就是该基金的策略模拟收益。
             </p>
             <p>
               场外基金一般按交易日收盘净值确认；本模拟器默认用当天净值成交，实盘会受到确认延迟、费率和净值更新滞后的影响。
@@ -501,8 +518,8 @@ export default function App() {
           }}
           onConfirm={confirmAndBacktest}
           title={activeFund ? `${activeFund.fundName} 净值数据` : '确认净值数据'}
-          description="当前表格只属于选中的这只基金。多只基金不会合并日期；确认后会作为一个组合一起回测。"
-          confirmLabel="确认全部基金并开始组合回测"
+          description="当前表格只属于选中的这只基金。单只基金会直接回测；多只基金会分别回测后汇总。"
+          confirmLabel="确认数据并开始策略回测"
           confirmDisabled={!allFunds.some((item) => item.rows.length)}
         />
 
@@ -510,21 +527,23 @@ export default function App() {
 
         <div className="flex flex-col gap-3 sm:flex-row">
           <button className="primary-button" disabled={!portfolio?.funds.length} onClick={rerunBacktest}>
-            使用当前参数重新组合回测
+            使用当前参数重新回测
           </button>
           <button
             className="secondary-button"
             disabled={!results.length}
-            onClick={() => downloadCsv('portfolio-backtest-records.csv', buildAllRecordsCsv(results))}
+            onClick={() => downloadCsv('backtest-records.csv', buildAllRecordsCsv(results))}
           >
-            导出组合每日记录 CSV
+            导出每日记录 CSV
           </button>
           <button
             className="secondary-button"
-            disabled={!newRuleResult?.rows.length}
-            onClick={() => downloadCsv('portfolio-new-rule-records.csv', backtestRowsToCsv(newRuleResult?.rows ?? []))}
+            disabled={!featuredResult?.rows.length}
+            onClick={() =>
+              downloadCsv('adaptive-profit-records.csv', backtestRowsToCsv(featuredResult?.rows ?? []))
+            }
           >
-            导出组合新版策略每日记录 CSV
+            导出三档收益优先每日记录 CSV
           </button>
         </div>
 
@@ -534,22 +553,22 @@ export default function App() {
           <div className="grid gap-6 xl:grid-cols-2">
             <AssetChart results={results} />
             <DrawdownChart results={results} />
-            {newRuleResult && <PositionChart rows={newRuleResult.rows} />}
-            {newRuleResult && <TradeSignalChart rows={newRuleResult.rows} />}
+            {featuredResult && <PositionChart rows={featuredResult.rows} strategyName={featuredResult.strategyName} />}
+            {featuredResult && <TradeSignalChart rows={featuredResult.rows} strategyName={featuredResult.strategyName} />}
           </div>
         )}
 
-        {portfolio && <TradeLogTable rows={portfolio.newRuleTradeRows} />}
+        {portfolio && <TradeLogTable rows={portfolio.featuredTradeRows} strategyName={STRATEGY_NAMES[featuredStrategyId]} />}
 
         <section className="section">
           <div className="section-header">
             <div>
-              <h2>组合参数优化</h2>
-              <p>组合回测口径已经改为多基金一起计算；参数优化也需要按组合口径重写，避免用单只基金结果误导判断。</p>
+              <h2>参数优化</h2>
+              <p>后续可以按单只基金或多基金汇总结果搜索参数，目标可选总收益、夏普和收益回撤比。</p>
             </div>
           </div>
           <div className="notice">
-            当前版本先输出组合回测、组合曲线和组合交易日志。下一步可以把参数优化改成“多基金组合目标函数”，按组合总收益、组合夏普和组合收益回撤比搜索参数。
+            当前版本先输出策略回测、资产曲线和交易日志。下一步可以把参数优化接到新三档策略上，按历史数据自动搜索更适合该基金的参数。
           </div>
         </section>
       </div>

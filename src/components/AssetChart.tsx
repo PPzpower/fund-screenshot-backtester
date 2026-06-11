@@ -40,7 +40,7 @@ export const AssetChart = ({ results }: Props) => {
       <div className="section-header">
         <div>
           <h2>资产曲线</h2>
-          <p>对比四种策略每日总资产变化。</p>
+          <p>对比所有策略每日总资产变化。</p>
         </div>
       </div>
       <div ref={ref} className="chart" />

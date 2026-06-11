@@ -3,6 +3,7 @@ import { backtestRowsToCsv, downloadCsv, formatMoney, formatPercent } from '../u
 
 type Props = {
   rows: BacktestRow[];
+  strategyName: string;
 };
 
 const actionText = {
@@ -17,7 +18,7 @@ const regimeText = {
   breakdown: '破位',
 };
 
-export const TradeLogTable = ({ rows }: Props) => {
+export const TradeLogTable = ({ rows, strategyName }: Props) => {
   const tradeRows = rows.filter((row) => row.action !== 'hold' && row.tradeAmount > 0);
   if (!rows.length) return null;
 
@@ -25,10 +26,10 @@ export const TradeLogTable = ({ rows }: Props) => {
     <section className="section">
       <div className="section-header">
         <div>
-          <h2>新版策略交易日志</h2>
+          <h2>{strategyName}交易日志</h2>
           <p>记录每一次加仓和减仓原因。</p>
         </div>
-        <button className="secondary-button" onClick={() => downloadCsv('new-rule-trades.csv', backtestRowsToCsv(tradeRows))}>
+        <button className="secondary-button" onClick={() => downloadCsv('adaptive-profit-trades.csv', backtestRowsToCsv(tradeRows))}>
           导出交易日志 CSV
         </button>
       </div>
@@ -64,7 +65,7 @@ export const TradeLogTable = ({ rows }: Props) => {
             {!tradeRows.length && (
               <tr>
                 <td colSpan={tradeRows.some((row) => row.fundName) ? 8 : 7} className="py-8 text-center text-slate-400">
-                  新版策略在这段数据中没有产生交易。
+                  {strategyName}在这段数据中没有产生交易。
                 </td>
               </tr>
             )}

@@ -4,9 +4,10 @@ import type { BacktestRow } from '../types';
 
 type Props = {
   rows: BacktestRow[];
+  strategyName: string;
 };
 
-export const PositionChart = ({ rows }: Props) => {
+export const PositionChart = ({ rows, strategyName }: Props) => {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -19,7 +20,7 @@ export const PositionChart = ({ rows }: Props) => {
       yAxis: { type: 'value', min: 0, max: 100, axisLabel: { formatter: '{value}%' } },
       series: [
         {
-          name: '新版策略仓位',
+          name: `${strategyName}仓位`,
           type: 'line',
           step: 'middle',
           symbol: 'none',
@@ -41,13 +42,13 @@ export const PositionChart = ({ rows }: Props) => {
       window.removeEventListener('resize', resize);
       chart.dispose();
     };
-  }, [rows]);
+  }, [rows, strategyName]);
 
   return (
     <section className="section">
       <div className="section-header">
         <div>
-          <h2>新版策略仓位</h2>
+          <h2>{strategyName}仓位</h2>
           <p>显示实际仓位与当前允许最高仓位。</p>
         </div>
       </div>
