@@ -42,7 +42,7 @@ const idleProgress: OcrProgress = {
   progress: 0,
 };
 
-const strategyIds: StrategyId[] = [
+const availableStrategyIds: StrategyId[] = [
   'buy_and_hold',
   'fixed_50_percent',
   'old_rule_strategy',
@@ -51,7 +51,7 @@ const strategyIds: StrategyId[] = [
   'adaptive_defensive_strategy',
 ];
 
-const featuredStrategyId: StrategyId = 'adaptive_profit_strategy';
+const defaultFocusedStrategyId: StrategyId = 'adaptive_profit_strategy';
 
 type FundBacktestBundle = {
   fundId: string;
@@ -201,7 +201,10 @@ const aggregateStrategyResults = (
 const runPortfolioBacktest = (
   fundDataSets: FundDataSet[],
   config: StrategyConfig,
+  selectedStrategyIds: StrategyId[],
+  focusedStrategyId: StrategyId,
 ): PortfolioBacktest => {
+  const strategies = selectedStrategyIds.length ? selectedStrategyIds : availableStrategyIds;
   const validFunds = fundDataSets
     .map((item) => ({
       fundId: item.id,
@@ -213,10 +216,10 @@ const runPortfolioBacktest = (
   const sleeveCash = validFunds.length ? config.initialCash / validFunds.length : config.initialCash;
   const funds: FundBacktestBundle[] = validFunds.map((fund) => ({
     ...fund,
-    results: runAllStrategies(fund.rows, { ...config, initialCash: sleeveCash }),
+    results: runAllStrategies(fund.rows, { ...config, initialCash: sleeveCash }, strategies),
   }));
 
-  const results = strategyIds.map((strategyId) =>
+  const results = strategies.map((strategyId) =>
     aggregateStrategyResults(
       strategyId,
       funds.map((fund) => ({
@@ -229,7 +232,7 @@ const runPortfolioBacktest = (
 
   const featuredTradeRows = funds
     .flatMap((fund) => {
-      const result = fund.results.find((item) => item.strategyId === featuredStrategyId);
+      const result = fund.results.find((item) => item.strategyId === focusedStrategyId);
       return (result?.rows ?? [])
         .filter((row) => row.action !== 'hold' && row.tradeAmount > 0)
         .map((row) => ({ ...row, fundName: fund.fundName }));
@@ -246,6 +249,8 @@ export default function App() {
   const [activeFundId, setActiveFundId] = useState<string>();
   const [portfolio, setPortfolio] = useState<PortfolioBacktest>();
   const [config, setConfig] = useState<StrategyConfig>(DEFAULT_STRATEGY_CONFIG);
+  const [selectedStrategyIds, setSelectedStrategyIds] = useState<StrategyId[]>(availableStrategyIds);
+  const [focusedStrategyId, setFocusedStrategyId] = useState<StrategyId>(defaultFocusedStrategyId);
   const [progress, setProgress] = useState<OcrProgress>(idleProgress);
   const [error, setError] = useState('');
   const [isRecognizing, setIsRecognizing] = useState(false);
@@ -271,9 +276,13 @@ export default function App() {
     [activeFundId, allFunds],
   );
   const results = portfolio?.results ?? [];
+  const hasBacktestRows = allFunds.some((item) => item.rows.length);
+  const activeFocusedStrategyId = selectedStrategyIds.includes(focusedStrategyId)
+    ? focusedStrategyId
+    : selectedStrategyIds[0] ?? defaultFocusedStrategyId;
   const featuredResult = useMemo(
-    () => results.find((result) => result.strategyId === featuredStrategyId),
-    [results],
+    () => results.find((result) => result.strategyId === activeFocusedStrategyId),
+    [activeFocusedStrategyId, results],
   );
   const bestReturnResult = useMemo(
     () =>
@@ -381,7 +390,7 @@ export default function App() {
   };
 
   const confirmAndBacktest = () => {
-    const nextPortfolio = runPortfolioBacktest(allFunds, config);
+    const nextPortfolio = runPortfolioBacktest(allFunds, config, selectedStrategyIds, activeFocusedStrategyId);
     setPortfolio(nextPortfolio);
     if (!nextPortfolio.funds.length) {
       setError('还没有任何基金拥有可回测的净值数据，请先完成 OCR 并核对表格。');
@@ -391,8 +400,32 @@ export default function App() {
   };
 
   const rerunBacktest = () => {
-    if (!allFunds.some((item) => item.rows.length)) return;
-    setPortfolio(runPortfolioBacktest(allFunds, config));
+    if (!hasBacktestRows) return;
+    setPortfolio(runPortfolioBacktest(allFunds, config, selectedStrategyIds, activeFocusedStrategyId));
+  };
+
+  const toggleStrategy = (strategyId: StrategyId) => {
+    if (selectedStrategyIds.includes(strategyId)) {
+      if (selectedStrategyIds.length === 1) return;
+      const next = selectedStrategyIds.filter((item) => item !== strategyId);
+      setSelectedStrategyIds(next);
+      if (focusedStrategyId === strategyId) setFocusedStrategyId(next[0]);
+    } else {
+      setSelectedStrategyIds(
+        availableStrategyIds.filter((item) => selectedStrategyIds.includes(item) || item === strategyId),
+      );
+    }
+    setPortfolio(undefined);
+  };
+  const selectAllStrategies = () => {
+    setSelectedStrategyIds(availableStrategyIds);
+    setPortfolio(undefined);
+  };
+
+  const selectAdaptiveStrategies = () => {
+    setSelectedStrategyIds(['adaptive_profit_strategy', 'adaptive_defensive_strategy']);
+    setFocusedStrategyId('adaptive_profit_strategy');
+    setPortfolio(undefined);
   };
 
   const activeRows = activeFund?.rows ?? [];
@@ -520,13 +553,58 @@ export default function App() {
           title={activeFund ? `${activeFund.fundName} 净值数据` : '确认净值数据'}
           description="当前表格只属于选中的这只基金。单只基金会直接回测；多只基金会分别回测后汇总。"
           confirmLabel="确认数据并开始策略回测"
-          confirmDisabled={!allFunds.some((item) => item.rows.length)}
+          confirmDisabled={!hasBacktestRows}
         />
+
+        <section className="section">
+          <div className="section-header">
+            <div>
+              <h2>{"\u7b56\u7565\u9009\u62e9"}</h2>
+              <p>{"\u52fe\u9009\u53c2\u4e0e\u56de\u6d4b\u7684\u7b56\u7565\uff0c\u5e76\u9009\u62e9\u4e00\u4e2a\u7528\u4e8e\u4ed3\u4f4d\u56fe\u3001\u4e70\u5356\u70b9\u548c\u4ea4\u6613\u65e5\u5fd7\u7684\u91cd\u70b9\u5c55\u793a\u7b56\u7565\u3002"}</p>
+            </div>
+            <div className="flex gap-2">
+              <button className="secondary-button" type="button" onClick={selectAllStrategies}>
+                {"\u5168\u90e8\u7b56\u7565"}
+              </button>
+              <button className="secondary-button" type="button" onClick={selectAdaptiveStrategies}>
+                {"\u53ea\u770b\u4e09\u6863"}
+              </button>
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {availableStrategyIds.map((strategyId) => {
+              const checked = selectedStrategyIds.includes(strategyId);
+              return (
+                <div key={strategyId} className="rounded-md border border-slate-200 bg-white p-3">
+                  <label className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      disabled={checked && selectedStrategyIds.length === 1}
+                      onChange={() => toggleStrategy(strategyId)}
+                    />
+                    {STRATEGY_NAMES[strategyId]}
+                  </label>
+                  <label className="mt-2 flex items-center gap-2 text-xs text-slate-500">
+                    <input
+                      type="radio"
+                      name="focusedStrategy"
+                      checked={activeFocusedStrategyId === strategyId}
+                      disabled={!checked}
+                      onChange={() => { setFocusedStrategyId(strategyId); setPortfolio(undefined); }}
+                    />
+                    {"\u91cd\u70b9\u5c55\u793a"}
+                  </label>
+                </div>
+              );
+            })}
+          </div>
+        </section>
 
         <StrategyConfigPanel config={config} onChange={setConfig} />
 
         <div className="flex flex-col gap-3 sm:flex-row">
-          <button className="primary-button" disabled={!portfolio?.funds.length} onClick={rerunBacktest}>
+          <button className="primary-button" disabled={!hasBacktestRows} onClick={rerunBacktest}>
             使用当前参数重新回测
           </button>
           <button
@@ -540,10 +618,10 @@ export default function App() {
             className="secondary-button"
             disabled={!featuredResult?.rows.length}
             onClick={() =>
-              downloadCsv('adaptive-profit-records.csv', backtestRowsToCsv(featuredResult?.rows ?? []))
+              downloadCsv('focused-strategy-records.csv', backtestRowsToCsv(featuredResult?.rows ?? []))
             }
           >
-            导出三档收益优先每日记录 CSV
+            {"\u5bfc\u51fa\u91cd\u70b9\u7b56\u7565\u6bcf\u65e5\u8bb0\u5f55 CSV"}
           </button>
         </div>
 
@@ -558,7 +636,7 @@ export default function App() {
           </div>
         )}
 
-        {portfolio && <TradeLogTable rows={portfolio.featuredTradeRows} strategyName={STRATEGY_NAMES[featuredStrategyId]} />}
+        {portfolio && <TradeLogTable rows={portfolio.featuredTradeRows} strategyName={STRATEGY_NAMES[activeFocusedStrategyId]} />}
 
         <section className="section">
           <div className="section-header">
